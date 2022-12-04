@@ -33,8 +33,6 @@ def parse_line(line):
     output = line.split(' -> ')[1]          # output will always be a wire
     operation = None
 
-    
-
     if input.isdigit():
         input_1 = int(input)
         operation = 'ASSIGN'
@@ -57,33 +55,28 @@ with open('test.txt', 'r') as input_file:
 
 digital_circuit = nx.DiGraph()
 
-# # first pass to create all nodes
-# # all nodes will be added with this since all output variables must eventually be driven by a defined value
-# for line in input_text:
-#     input_1, input_2, operation, output = parse_line(line)
-#     digital_circuit.add_node(output, label=output, operation=operation, output_value=None)
+# first pass to create all nodes
+# all nodes will be added with this since all output variables must eventually be driven by a defined value
+for line in input_text:
+    input_1, input_2, operation, output = parse_line(line)
+    digital_circuit.add_node(output, label=output, operation=operation, output_value=None)
 
-# # assigning the edges
-# for line in input_text:
-#     input_1, input_2, operation, output = parse_line(line)
+# assigning the edges
+for line in input_text:
+    input_1, input_2, operation, output = parse_line(line)
     
-#     if operation == 'ASSIGN':                       # this node must be a source node if it only drives an input literal
-#         digital_circuit.nodes[output]['output_value'] = input_1     # special case because of assign
-#     elif operation == 'AND' or operation == 'OR':
-#         digital_circuit.add_edge(input_1, output, wire_value=None, title=input_1)
-#         digital_circuit.add_edge(input_2, output, wire_value=None, title=input_2)
-#     else:
-#         digital_circuit.add_edge(input_1, output, wire_value=None, title=input_1)
+    if operation == 'ASSIGN':                       # this node must be a source node if it only drives an input literal
+        digital_circuit.nodes[output]['output_value'] = input_1     # special case because of assign
+    elif operation == 'AND' or operation == 'OR':
+        digital_circuit.add_edge(input_1, output, wire_value=None, title=input_1)
+        digital_circuit.add_edge(input_2, output, wire_value=None, title=input_2)
+    else:   # this is shift operator case, input_1 contains the shift amount
+        digital_circuit.add_edge(input_1, output, wire_value=None, title=input_1)
 
-digital_circuit.add_node(0)
-digital_circuit.add_node(1)
-digital_circuit.add_node(2)
-digital_circuit.add_node(3)
-
-digital_circuit.add_edge(0,2)
-digital_circuit.add_edge(1,2)
-digital_circuit.add_edge(2,3)
 
 pyvis_network = Network('500px', '500px', directed=True)
 pyvis_network.from_nx(digital_circuit)
 html_content = pyvis_network.generate_html('circuit.html')
+
+with open('circuit.html', 'w') as output_file:
+    output_file.write(html_content)
