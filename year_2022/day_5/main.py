@@ -29,7 +29,11 @@ for line in instructions:
     for s in instruction:
         if s.isdigit():
             instruction_n.append(int(s))
-            
+
+    move_amount = instruction_n[0]
+    source = instruction_n[1]
+    destination = instruction_n[2]
+
 
     
 
