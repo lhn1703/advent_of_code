@@ -1,5 +1,4 @@
 import networkx as nx
-from pyvis.network import Network
 
 with open('input.txt', 'r') as input_file:
     input_text = input_file.read().splitlines()
@@ -62,13 +61,5 @@ for node in filesystem.nodes:
 
 print('part2:', min(potential_delete_sizes))
 
-
-filename = 'file.html'
-pyvis_network = Network()
-pyvis_network.from_nx(filesystem, default_node_size=2)
-html_content = pyvis_network.show(filename)
-
-# with open(filename, 'w') as output_file:
-#     output_file.write(html_content)
 
 
