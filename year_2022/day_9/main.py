@@ -1,10 +1,8 @@
-with open('input.txt', 'r') as input_file:
+with open('test.txt', 'r') as input_file:
     input_text = input_file.read().splitlines()
 
-def move(h_coord, t_coord, direction):            # can only move 1 tile at a time
+def move_head(h_coord, direction):
     hx, hy = h_coord
-    tx, ty = t_coord
-
     if direction == 'U':
         hx += 1
     elif direction == 'D':
@@ -15,7 +13,11 @@ def move(h_coord, t_coord, direction):            # can only move 1 tile at a ti
         hy += 1
     else:
         raise Exception(direction, 'is not a valid direction')
+    return (hx, hy)
 
+def move_tail(new_h_coord, t_coord, direction):            # can only move 1 tile at a time
+    hx, hy = new_h_coord
+    tx, ty = t_coord
 
     # generate all adjacent coordinates to the head, also including the head location so 9 total
     adjacent_coordinates = (
@@ -56,10 +58,9 @@ def move(h_coord, t_coord, direction):            # can only move 1 tile at a ti
             ty += 1
             tx = hx
     
-    new_h_coord = (hx, hy)
     new_t_coord = (tx, ty)
 
-    return new_h_coord, new_t_coord
+    return new_t_coord
 
 h_coord = (0,0)
 t_coord = (0,0)
@@ -71,34 +72,32 @@ for line in input_text:
     steps = int(line.split()[1])
 
     for step in range(steps):
-        h_coord, t_coord = move(h_coord, t_coord, direction)
+        h_coord = move_head(h_coord, direction)
+        t_coord = move_tail(h_coord, t_coord, direction)    
         if t_coord not in unique_t_coords:
             unique_t_coords.append(t_coord)
 
 print('part1:', len(unique_t_coords))
 
-# rope = []
-# for i in range(10):
-#     rope.append((0,0))
+rope = []
+for i in range(10):
+    rope.append((0,0))
 
-# unique_t_coords = [(0,0)]
+unique_t_coords = [(0,0)]
 
-# for line in input_text:
-#     direction = line.split()[0]
-#     steps = int(line.split()[1])
+for line in input_text:
+    direction = line.split()[0]
+    steps = int(line.split()[1])
 
-#     for i in range(len(rope)-1):
-#         current_h_coord = rope[i]
-#         current_t_coord = rope[i+1]
+    for step in range(steps):
+        rope[0] = move_head(rope[0], direction)
+        for i in range(len(rope)-1):
+            rel_h_coord = rope[i]
+            
+            rel_t_coord = rope[i+1]
+            rope[i+1] = move_tail(rel_h_coord, rel_t_coord, direction)
+        if rope[9] not in unique_t_coords:
+            unique_t_coords.append(rope[9])
+    print(rope[0], rope[9])
 
-#         for step in range(steps):
-#             new_h_coord, new_t_coord = move(h_coord, t_coord, direction)
-#             rope[i] = new_h_coord
-#             rope[i+1] = new_t_coord
-#             print(current_h_coord, current_h_coord, new_h_coord, new_t_coord)
-
-#         if rope[9] not in unique_t_coords:
-#             unique_t_coords.append(rope[9])
-
-
-# print('part2:', len(unique_t_coords))
+print('part2:', len(unique_t_coords))
