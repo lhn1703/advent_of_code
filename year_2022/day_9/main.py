@@ -96,8 +96,10 @@ for line in input_text:
             
             rel_t_coord = rope[i+1]
             rope[i+1] = move_tail(rel_h_coord, rel_t_coord, direction)
+
+            print('direction:', direction, ',step:', step, ',i:', i, rope)
+            input("Press Enter to continue...")
         if rope[9] not in unique_t_coords:
             unique_t_coords.append(rope[9])
-    print(rope[0], rope[9])
 
 print('part2:', len(unique_t_coords))
