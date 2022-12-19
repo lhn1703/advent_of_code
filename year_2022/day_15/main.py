@@ -1,155 +1,81 @@
-with open('input.txt', 'r') as input_file:
+import parse
+
+with open('test.txt', 'r') as input_file:
     input_text = input_file.read().splitlines()
 
-grid_zize = 600
+min_x = None
+max_x = None
+min_y = None
+max_y = None
+
 map = {}
-for y in range(grid_zize):
-    for x in range(grid_zize):
-        coord = (x,y)
-        map[coord] = '.'
-source_coord = (500,0)
-map[source_coord] = '+'
 
+# first pass to map the initial board
 for line in input_text:
-    input_list = line.split(' -> ')
-    for i in range(len(input_list)-1):
-        str_coord_0 = input_list[i]
-        str_coord_1 = input_list[i+1]
+    sensor_x, sensor_y, beacon_x, beacon_y = parse.parse('Sensor at x={}, y={}: closest beacon is at x={}, y={}', line)
+    sensor_x, sensor_y, beacon_x, beacon_y = int(sensor_x), int(sensor_y), int(beacon_x), int(beacon_y)
 
-        x0 = int(str_coord_0.split(',')[0])
-        y0 = int(str_coord_0.split(',')[1])
-        x1 = int(str_coord_1.split(',')[0])
-        y1 = int(str_coord_1.split(',')[1])
+    # map[(sensor_x, sensor_y)] = 'S'
+    # map[(beacon_x, beacon_y)] = 'B'
 
-        # fill in the endpoints first
-        map[(x0,y0)] = '#'
-        map[(x1,y1)] = '#'
+    manhattan_distance = abs(beacon_x - sensor_x) + abs(beacon_y - sensor_y)
 
-        while x0 < x1:
-            x0 += 1
-            map[(x0,y0)] = '#'
-        while x1 < x0:
-            x1 += 1
-            map[(x1,y1)] = '#'
-        while y0 < y1:
-            y0 += 1
-            map[(x0,y0)] = '#'
-        while y1 < y0:
-            y1 += 1
-            map[(x1,y1)] = '#'
+    if min_x == None or sensor_x - manhattan_distance < min_x:
+        min_x = sensor_x - manhattan_distance
+    if min_y == None or sensor_y - manhattan_distance < min_y:
+        min_y = sensor_y - manhattan_distance
+    if max_x == None or sensor_x + manhattan_distance > max_x:
+        max_x = sensor_x + manhattan_distance
+    if max_y == None or sensor_y + manhattan_distance > max_y:
+        max_y = sensor_y + manhattan_distance
 
-def sand_fall(source_coord = source_coord):
-    x, y = source_coord
-    while True:
-        down_coord = (x,y+1)
-        left_down_coord = (x-1,y+1)
-        right_down_coord = (x+1,y+1)
-        if y+1 >= grid_zize:                      # falls into abyss
-            return None
-        if map[down_coord] == '.':
-            x, y = down_coord
-        elif map[left_down_coord] == '.':
-            x, y = left_down_coord
-        elif map[right_down_coord] == '.':
-            x, y = right_down_coord
-        else:
-            break
-    return (x,y)
+for y in range(min_y, max_y+1):
+    for x in range(min_x, max_x+1):
+        map[(x,y)] = '.'
+
+def recursive_scan(x0, y0, x1, y1, manhattan_distance):
+    current_mhd = abs(x1 - x0) + abs(y1 - y0)
+    print(x0, y0, x1, y1, manhattan_distance, current_mhd)
+    if current_mhd > manhattan_distance:
+        return
     
-
-i = 0
-while True:
-    if sand_fall() == None:
-        break
-    else:
-        map[sand_fall()] = 'o'
-    i += 1
-print('part1', i)
-
-
-### PART 2 ###
-
-with open('input.txt', 'r') as input_file:
-    input_text = input_file.read().splitlines()
-
-max_y = 0
-for line in input_text:
-    input_list = line.split(' -> ')
-    for s in input_list:
-        x, y = int(s.split(',')[0]), int(s.split(',')[1])
-        if y > max_y:
-            max_y = y
-max_y += 3
-
-max_x = 100000
-map = {}
-for y in range(max_y):
-    for x in range(max_x):
-        coord = (x,y)
-        map[coord] = '.'
-source_coord = (500,0)
-map[source_coord] = '+'
-for x in range(max_x):
-    map[(x,max_y-1)] = '#'
-
-for line in input_text:
-    input_list = line.split(' -> ')
-    for i in range(len(input_list)-1):
-        str_coord_0 = input_list[i]
-        str_coord_1 = input_list[i+1]
-
-        x0 = int(str_coord_0.split(',')[0])
-        y0 = int(str_coord_0.split(',')[1])
-        x1 = int(str_coord_1.split(',')[0])
-        y1 = int(str_coord_1.split(',')[1])
-
-        # fill in the endpoints first
-        map[(x0,y0)] = '#'
+    if map[(x1,y1)] == '.':
         map[(x1,y1)] = '#'
-
-        while x0 < x1:
-            x0 += 1
-            map[(x0,y0)] = '#'
-        while x1 < x0:
-            x1 += 1
-            map[(x1,y1)] = '#'
-        while y0 < y1:
-            y0 += 1
-            map[(x0,y0)] = '#'
-        while y1 < y0:
-            y1 += 1
-            map[(x1,y1)] = '#'
-
-def sand_fall(source_coord = source_coord):
-    x, y = source_coord
-    xs, ys = source_coord
-    while True:
-        down_coord = (x,y+1)
-        left_down_coord = (x-1,y+1)
-        right_down_coord = (x+1,y+1)
-        
-        # if the 3 blocks below origin is filled, then the source will be filled
-        # brute force approach, but my i9-13900k and 32GB RAM can handle it
-        if map[(xs, ys+1)] == 'o' and map[(xs-1, ys+1)] == 'o' and map[(xs+1, ys+1)] == 'o':        
-            return None
-
-        if map[down_coord] == '.':
-            x, y = down_coord
-        elif map[left_down_coord] == '.':
-            x, y = left_down_coord
-        elif map[right_down_coord] == '.':
-            x, y = right_down_coord
-        else:
-            break
-    return (x,y)
     
-i = 1
-while True:
-    if sand_fall() == None:
-        break
-    else:
-        map[sand_fall()] = 'o'
-    i += 1
+    # recusively check all four adjacent quadrants of the origin
+    recursive_scan(x0, y0, x1-1, y1, manhattan_distance)
+    recursive_scan(x0, y0, x1+1, y1, manhattan_distance)
+    recursive_scan(x0, y0, x1, y1-1, manhattan_distance)
+    recursive_scan(x0, y0, x1, y1+1, manhattan_distance)
 
-print('part2', i)
+
+# second pass to perform aglorithm
+# for line in input_text:
+#     sensor_x, sensor_y, beacon_x, beacon_y = parse.parse('Sensor at x={}, y={}: closest beacon is at x={}, y={}', line)
+#     sensor_x, sensor_y, beacon_x, beacon_y = int(sensor_x), int(sensor_y), int(beacon_x), int(beacon_y)
+#     manhattan_distance = abs(beacon_x - sensor_x) + abs(beacon_y - sensor_y)
+
+#     map[(sensor_x, sensor_y)] = 'S'
+#     map[(beacon_x, beacon_y)] = 'B'
+
+#     # current_x, current_y = sensor_x, sensor_y
+
+#     recursive_scan(sensor_x, sensor_y, sensor_x, sensor_y, manhattan_distance)
+
+line = input_text[6]
+sensor_x, sensor_y, beacon_x, beacon_y = parse.parse('Sensor at x={}, y={}: closest beacon is at x={}, y={}', line)
+sensor_x, sensor_y, beacon_x, beacon_y = int(sensor_x), int(sensor_y), int(beacon_x), int(beacon_y)
+manhattan_distance = abs(beacon_x - sensor_x) + abs(beacon_y - sensor_y)
+
+map[(sensor_x, sensor_y)] = 'S'
+map[(beacon_x, beacon_y)] = 'B'
+
+# current_x, current_y = sensor_x, sensor_y
+
+recursive_scan(sensor_x, sensor_y, sensor_x, sensor_y, manhattan_distance)
+    
+for y in range(min_y, max_y+1):
+    for x in range(min_x, max_x+1):
+        print(map[(x,y)], end='')
+    print('\n')
 
