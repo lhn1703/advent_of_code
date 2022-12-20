@@ -1,6 +1,7 @@
 import parse
+from tqdm import tqdm
 
-with open('test.txt', 'r') as input_file:
+with open('input.txt', 'r') as input_file:
     input_text = input_file.read().splitlines()
 
 min_x = None
@@ -11,7 +12,7 @@ max_y = None
 map = {}
 
 # first pass to map the initial board
-for line in input_text:
+for line in tqdm(input_text, desc='init:'):
     sensor_x, sensor_y, beacon_x, beacon_y = parse.parse('Sensor at x={}, y={}: closest beacon is at x={}, y={}', line)
     sensor_x, sensor_y, beacon_x, beacon_y = int(sensor_x), int(sensor_y), int(beacon_x), int(beacon_y)
 
@@ -29,53 +30,41 @@ for line in input_text:
     if max_y == None or sensor_y + manhattan_distance > max_y:
         max_y = sensor_y + manhattan_distance
 
-for y in range(min_y, max_y+1):
-    for x in range(min_x, max_x+1):
+for y in tqdm(range(min_y, max_y+1), desc='y init:'):
+    for x in tqdm(range(min_x, max_x+1), desc='x init:'):
         map[(x,y)] = '.'
 
-def recursive_scan(x0, y0, x1, y1, manhattan_distance):
-    current_mhd = abs(x1 - x0) + abs(y1 - y0)
-    print(x0, y0, x1, y1, manhattan_distance, current_mhd)
-    if current_mhd > manhattan_distance:
-        return
+def scan_range(x0, y0, manhattan_distance):
+    for x1 in tqdm(range(x0 - manhattan_distance, x0 + manhattan_distance + 1), 'x'):
+        for y1 in range(y0 - manhattan_distance, y0 + manhattan_distance + 1):
+            current_mhd = abs(x1 - x0) + abs(y1 - y0)
+            if current_mhd > manhattan_distance:
+                continue
+            elif (x1,y1) not in map.keys():
+                map[(x1,y1)] = '#'
     
-    if map[(x1,y1)] == '.':
-        map[(x1,y1)] = '#'
-    
-    # recusively check all four adjacent quadrants of the origin
-    recursive_scan(x0, y0, x1-1, y1, manhattan_distance)
-    recursive_scan(x0, y0, x1+1, y1, manhattan_distance)
-    recursive_scan(x0, y0, x1, y1-1, manhattan_distance)
-    recursive_scan(x0, y0, x1, y1+1, manhattan_distance)
 
 
 # second pass to perform aglorithm
-# for line in input_text:
-#     sensor_x, sensor_y, beacon_x, beacon_y = parse.parse('Sensor at x={}, y={}: closest beacon is at x={}, y={}', line)
-#     sensor_x, sensor_y, beacon_x, beacon_y = int(sensor_x), int(sensor_y), int(beacon_x), int(beacon_y)
-#     manhattan_distance = abs(beacon_x - sensor_x) + abs(beacon_y - sensor_y)
+for line in tqdm(input_text, desc='line:'):
+    sensor_x, sensor_y, beacon_x, beacon_y = parse.parse('Sensor at x={}, y={}: closest beacon is at x={}, y={}', line)
+    sensor_x, sensor_y, beacon_x, beacon_y = int(sensor_x), int(sensor_y), int(beacon_x), int(beacon_y)
+    manhattan_distance = abs(beacon_x - sensor_x) + abs(beacon_y - sensor_y)
 
-#     map[(sensor_x, sensor_y)] = 'S'
-#     map[(beacon_x, beacon_y)] = 'B'
+    map[(sensor_x, sensor_y)] = 'S'
+    map[(beacon_x, beacon_y)] = 'B'
 
-#     # current_x, current_y = sensor_x, sensor_y
+    current_x, current_y = sensor_x, sensor_y
+    scan_range(current_x, current_y, manhattan_distance)
 
-#     recursive_scan(sensor_x, sensor_y, sensor_x, sensor_y, manhattan_distance)
+# for y in range(min_y, max_y+1):
+#     for x in range(min_x, max_x+1):
+#         print(map[(x,y)], end='')
+#     print('\n')
 
-line = input_text[6]
-sensor_x, sensor_y, beacon_x, beacon_y = parse.parse('Sensor at x={}, y={}: closest beacon is at x={}, y={}', line)
-sensor_x, sensor_y, beacon_x, beacon_y = int(sensor_x), int(sensor_y), int(beacon_x), int(beacon_y)
-manhattan_distance = abs(beacon_x - sensor_x) + abs(beacon_y - sensor_y)
-
-map[(sensor_x, sensor_y)] = 'S'
-map[(beacon_x, beacon_y)] = 'B'
-
-# current_x, current_y = sensor_x, sensor_y
-
-recursive_scan(sensor_x, sensor_y, sensor_x, sensor_y, manhattan_distance)
-    
-for y in range(min_y, max_y+1):
-    for x in range(min_x, max_x+1):
-        print(map[(x,y)], end='')
-    print('\n')
+sum = 0
+for x in range(min_x, max_x+1):
+    if (x,2000000) in map.keys() and map[(x,10)] == '#':
+        sum += 1
+print('part1', sum)
 
