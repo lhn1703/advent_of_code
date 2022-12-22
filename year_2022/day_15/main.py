@@ -57,7 +57,6 @@ for x in range(min_x, max_x + 1):
         continue
     
     for sensor in sensor_list:
-        
         sensor_x = sensor.sensor_x
         sensor_y = sensor.sensor_y
         current_mhd = mhd(x, y_pos, sensor_x, sensor_y)
