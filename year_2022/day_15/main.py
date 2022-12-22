@@ -24,7 +24,6 @@ class Sensor:
         self.beacon_x = beacon_x
         self.beacon_y = beacon_y
         self.manhattan_distance = manhattan_distance
-    perimeter = None
 
 # first pass to map the initial board
 for line in input_text:
@@ -48,24 +47,22 @@ for line in input_text:
     if max_y == None or sensor_y + manhattan_distance > max_y:
         max_y = sensor_y + manhattan_distance
 
-
-
 sum = 0
 for x in range(min_x, max_x + 1):
     current_coord = (x, y_pos)
-    if current_coord in map.keys():
-        continue
     
     for sensor in sensor_list:
+        if current_coord in map.keys():
+            continue
         sensor_x = sensor.sensor_x
         sensor_y = sensor.sensor_y
         current_mhd = mhd(x, y_pos, sensor_x, sensor_y)
         if current_mhd <= sensor.manhattan_distance:
             map[current_coord] = '#'
             sum += 1
-            continue
 
 print('part1', sum)
+
 
 ### PART 2 ALGORITHM ###
 # solution from https://www.youtube.com/watch?v=w7m48_uCvWI 
