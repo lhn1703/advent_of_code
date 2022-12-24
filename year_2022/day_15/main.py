@@ -1,10 +1,10 @@
 import parse
-from itertools import combinations, permutations
+from itertools import product
 
-with open('test.txt', 'r') as input_file:
+with open('input.txt', 'r') as input_file:
     input_text = input_file.read().splitlines()
 
-boundary = 20
+boundary = 4000000
 y_pos = 10
 
 min_x = None
@@ -25,6 +25,13 @@ class Sensor:
         self.beacon_x = beacon_x
         self.beacon_y = beacon_y
         self.manhattan_distance = manhattan_distance
+
+# ax + by = c
+class Line:
+    def __init__(self, a, b, c) -> None:
+        self.a = a
+        self.b = b
+        self.c = c
 
 # first pass to map the initial board
 for line in input_text:
@@ -66,101 +73,81 @@ for line in input_text:
 
 
 ### PART 2 ALGORITHM ###
-# solution from https://www.youtube.com/watch?v=w7m48_uCvWI 
-# each sensor has a manhattan perimiter that is diamond shaped
-# y - y0 = m(x - x0) + d
-# m = ± 1
-# d = ± manhattan distance
-# at sensor location (x0, y0)
-# positive line eqn: y = x + (-x0 + y0 ± d)
-# negative line eqn: y = -x + (x0 + y0 ± d)
-# find the points where a pair of positive lines have a gap of 2
-    # out of those points find the point where the a pair of negative lines have a gap of 2
-        # verify that this point is not wihtin manhattan distance of any sensor
+'''
+every sensor has a perimeter that is shaped like a paralellogram
+each of the lines of that perimeter has a slope of 1 or -1
+point slope form: y - y0 = m(x - x0) + d
+    sensor origin = (x0,y0) 
+    slope m = 1 or -1
+    intercept d = (mhd+1) or -(mhd+1)
+convert line to ax + by = c and extract a,b,c
+    positive lines: -1x + 1y = -x0 + y0 +- d
+        a = -1
+        b = 1
+        c = -x0 + y0 +- d
+    negative lines: 1x + 1y = x0 + y0 +- d
+        a = 1
+        b = 1
+        c = x0 + y0 +- d
+cramer's rule intersection point: (x,y) = ((c1*b2-b1*c2)/(a1*b2-b1*a2), (a1*c2-c1*a2)/(a1*b2-b1*a2))
+search through every possible intersection points by taking permutations of the two lines lists
+    if intersection point:
+        check if point falls within boundaries
+        check if it is not detected by any sensor at all
+'''
 
-negative_line_intercepts = []
-positive_line_intercepts = []
+intersection_points = []
+pos_lines = []
+neg_lines = []
 
 for line in input_text:
     sensor_x, sensor_y, beacon_x, beacon_y = parse.parse('Sensor at x={}, y={}: closest beacon is at x={}, y={}', line)
     sensor_x, sensor_y, beacon_x, beacon_y = int(sensor_x), int(sensor_y), int(beacon_x), int(beacon_y)
-    manhattan_distance = mhd(sensor_x, sensor_y, beacon_x, beacon_y)
+    manhattan_distance = mhd(sensor_x, sensor_y, beacon_x, beacon_y) + 1 # looking for line just outside mhd
 
-    positive_line_intercepts.append(-sensor_x + sensor_y + manhattan_distance)
-    positive_line_intercepts.append(-sensor_x + sensor_y - manhattan_distance)
-    negative_line_intercepts.append(sensor_x + sensor_y + manhattan_distance)
-    negative_line_intercepts.append(sensor_x + sensor_y - manhattan_distance)
+    pos_line1 = Line(-1, 1, -sensor_x + sensor_y + manhattan_distance)
+    pos_line2 = Line(-1, 1, -sensor_x + sensor_y - manhattan_distance)
+    neg_line1 = Line(1, 1, sensor_x + sensor_y + manhattan_distance)
+    neg_line2 = Line(1, 1, sensor_x + sensor_y - manhattan_distance)
 
-    print('sensor ({},{}), d={}, pos={},{}; neg={},{}'.format(sensor_x, sensor_y, manhattan_distance, -sensor_x + sensor_y + manhattan_distance, -sensor_x + sensor_y - manhattan_distance, sensor_x + sensor_y + manhattan_distance, sensor_x + sensor_y - manhattan_distance))
+    pos_lines.append(pos_line1)
+    pos_lines.append(pos_line2)
+    neg_lines.append(neg_line1)
+    neg_lines.append(neg_line2)
 
-positive_line_intercepts = list(set(positive_line_intercepts))
-negative_line_intercepts = list(set(negative_line_intercepts))
+line_pairs = list(product(pos_lines, neg_lines))
+line_pairs = list(set(line_pairs))                  # removes all duplicate points
 
-p_temp = []
-n_temp = []
-for i in range(len(positive_line_intercepts)):
-    if 0 <= positive_line_intercepts[i] <= boundary:
-        p_temp.append(positive_line_intercepts[i])
-for i in range(len(negative_line_intercepts)):
-    if 0 <= negative_line_intercepts[i] <= boundary:
-        n_temp.append(negative_line_intercepts[i])
+for line_pair in line_pairs:
+    line1, line2 = line_pair
+    a1, b1, c1 = line1.a, line1.b, line1.c
+    a2, b2, c2 = line2.a, line2.b, line2.c
 
-positive_line_intercepts = p_temp
-negative_line_intercepts = n_temp
+    x, y = (c1*b2-b1*c2)/(a1*b2-b1*a2), (a1*c2-c1*a2)/(a1*b2-b1*a2)
 
+    if x % 1 != 0 or y % 1 != 0:        # check if they are both integers
+        continue
+    if not (0 <= x <= boundary and 0 <= y <= boundary) :  # check if they both are within the boundary
+        continue
 
-print(sorted(positive_line_intercepts))
-print(sorted(negative_line_intercepts))
+    point = (int(x), int(y))
+    intersection_points.append(point)
 
-neg_intercept_combinations = list(combinations(negative_line_intercepts, 2))
-pos_intercept_combinations = list(combinations(positive_line_intercepts, 2))
-
-# print(pos_intercept_combinations)
-# print(neg_intercept_combinations)
-
-pos_intercept_candidates = []
-neg_intercept_candidates = []
-
-# the solution must be in between these intercept pairs
-for combo in pos_intercept_combinations:
-    intercept0, intercept1 = combo
-    if abs(intercept0 - intercept1) == 2:
-        pos_intercept_candidates.append(combo)
-for combo in neg_intercept_combinations:
-    intercept0, intercept1 = combo
-    if abs(intercept0 - intercept1) == 2:
-        neg_intercept_candidates.append(combo)
-
-# the point must be vertical midpoint between two positive intercept candidate pairs
-# the point must be the horizontal midpoint between two negative intercept candidate pairs
-
-
-beacon_candidates = []
-for pos_combo in pos_intercept_candidates:
-    pos1, pos2 = pos_combo
-    x = (pos1 + pos2) / 2
-    for neg_combo in neg_intercept_candidates:
-        neg1, neg2 = neg_combo
-        y = (neg1 + neg2) / 2
-        beacon_candidates.append((x,y))
-
-beacon_candidates = list(set(beacon_candidates))
-
-for b in beacon_candidates:
-    print(b)
-
-for beacon_candidate in beacon_candidates:
+intersection_points = list(set(intersection_points))    # remove duplicates
+solution_point = None
+for point in sorted(intersection_points):
     found = True
-    beacon_x, beacon_y = beacon_candidate
     for sensor in sensor_list:
-        sensor_x = sensor.sensor_x
-        sensor_y = sensor.sensor_y
-        current_mhd = mhd(beacon_x, beacon_y, sensor_x, sensor_y)
-        if current_mhd <= sensor.manhattan_distance:
+        x0, y0 = point
+        x1, y1 = sensor.sensor_x, sensor.sensor_y
+        current_mhd = mhd(x0, y0, x1, y1)
+        sensor_mhd = sensor.manhattan_distance
+        if current_mhd <= sensor_mhd:
             found = False
             break
     if found:
-        print('part2', beacon_candidate)
+        solution_point = point
         break
-            
 
+x, y = solution_point
+print('part2', solution_point, x * 4000000 + y)
