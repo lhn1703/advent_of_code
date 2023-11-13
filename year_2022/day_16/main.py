@@ -1,32 +1,30 @@
 from parse import parse
+import argparse
 import networkx as nx
-from pyvis.network import Network
+from copy import deepcopy
 
-'''
-priority:
-    if current valve is closed:
-        check all adjacent closed valves
-        if there is an adjacent closed valve:
-            check if moving 
+parser = argparse.ArgumentParser(description='AOC')
+parser.add_argument('-i','--input', help='input text file', required=True)
+args = parser.parse_args()
+input_file = args.input
 
-'''
-
-def visualize(nx_graph):
-    nt = Network(directed=True)
-    # populates the nodes and edges data structures
-    nt.from_nx(nx_graph)
-    nt.show('nx.html')
-
-with open('test.txt', 'r') as input_file:
+with open(input_file, 'r') as input_file:
     input_text = input_file.read().splitlines()
 
 time_limit = 30
+time_to_open = 1
 tunnel = nx.DiGraph()
+timeline = nx.DiGraph()
+
+valve_rate = {}
 
 for line in input_text:
     line = line.replace('tunnel leads to valve', 'tunnels lead to valves') # for parsing purposes
     source, rate, dest_list = parse('Valve {} has flow rate={}; tunnels lead to valves {}', line)
     rate = int(rate)
+
+    valve_rate[source] = rate
+
     # print(source, rate, dest_list)
     dest_list = dest_list.split(', ')
     for dest in dest_list:
@@ -34,48 +32,72 @@ for line in input_text:
         tunnel.nodes[source]['rate'] = rate
 nx.set_node_attributes(tunnel, False, 'open')           # initializes the attribute for all nodes
 
-path_list = ['AA']
-pressure_released = 0
-current_location = 'AA'
-next_location = None
-
-for node in tunnel.nodes:
+for node in tunnel.nodes:                               # if a valve has 0, treat it as already opened
     if tunnel.nodes[node]['rate'] == 0:
         tunnel.nodes[node]['open'] = True
 
+# creating distance matrix between valves
+shortest_path_dict = {}
+for src in tunnel.nodes:
+    shortest_path_dict[src] = {}
+    for dst in tunnel.nodes:
+        shortest_path_dict[src][dst] = nx.shortest_path_length(tunnel, source=src, target=dst)
 
-# make a tree of all possible timelines
+def get_closed_valves():
+    closed_valves = set()
+    for node in tunnel.nodes:
+        if tunnel.nodes[node]['open'] == False:
+            closed_valves.add(node)
+    return closed_valves
 
-# this greedy algorithm does not guarantee optimal solution, but an approximate one
-# must implement a bfs tree to search all possible timelines
+initial_closed_valves = get_closed_valves()
 
-time_remaining = time_limit
-while time_remaining > 0:
-    pressure_release_potential = 0
-    for next_node in tunnel.nodes:
-        if current_location == next_node or tunnel.nodes[next_node]['open'] == True:
+# https://www.reddit.com/r/adventofcode/comments/zo21au/comment/j0nz8df/?utm_source=share&utm_medium=web2x&context=3 
+bfs_queue = []
+possible_board_states = []
+
+board_state = {
+    'position': 'AA',
+    'time_remaining': time_limit,
+    'pressure_released': 0,
+    'remaining_valves': initial_closed_valves
+}
+
+bfs_queue.append(board_state)
+possible_board_states.append(board_state)
+while bfs_queue != []:
+    current_board_state = bfs_queue.pop(0)
+    current_position = current_board_state['position']
+    time_remaining = current_board_state['time_remaining']
+    pressure_released = current_board_state['pressure_released']
+    remaining_valves = current_board_state['remaining_valves']
+
+    for next_valve in remaining_valves:
+        time_cost = shortest_path_dict[current_position][next_valve] + time_to_open
+        potential_pressure_released = (time_remaining - time_cost) *  valve_rate[next_valve]
+        if potential_pressure_released < 0:             # if time cost is more than time remaining, then cannot open this valve
             continue
-        cost = nx.shortest_path_length(tunnel, source=current_location, target=next_node) + 1
-        pressure_release_potential_temp = (time_remaining - cost) * tunnel.nodes[next_node]['rate']
 
-        print('time remaining {}, current node {}, possible next node {}, cost {}, potential release {}'.format(time_remaining, current_location, next_node, cost, pressure_release_potential_temp))
+        new_position = next_valve
+        new_time_remaining = time_remaining - time_cost
+        new_pressure_released = pressure_released + potential_pressure_released
+        new_remaining_valves = deepcopy(remaining_valves)
+        new_remaining_valves.remove(new_position)
 
-        if (pressure_release_potential_temp > pressure_release_potential):
-            pressure_release_potential = pressure_release_potential_temp
-            next_location = next_node
-    
-    time_remaining -= cost
-    if time_remaining < 0:
-        break
+        new_board_state = {
+            'position': new_position,
+            'time_remaining': new_time_remaining,
+            'pressure_released': new_pressure_released,
+            'remaining_valves': new_remaining_valves
+        }
 
-    if current_location == next_location:
-        break
+        bfs_queue.append(new_board_state)
+        possible_board_states.append(new_board_state)
 
-    path_list.append(next_location)
-    tunnel.nodes[next_location]['open'] = True
-    pressure_released += pressure_release_potential
-    current_location = next_location
+pressure = 0
+for board_state in possible_board_states:
+    # print(board_state)
+    if board_state['pressure_released'] > pressure:
+        pressure = board_state['pressure_released']
+print(pressure)
 
-print(path_list)
-print(pressure_released)
-        
