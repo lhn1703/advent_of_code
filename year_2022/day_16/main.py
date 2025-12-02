@@ -2,6 +2,7 @@ from parse import parse
 import argparse
 import networkx as nx
 from copy import deepcopy
+import itertools
 
 parser = argparse.ArgumentParser(description='AOC')
 parser.add_argument('-i','--input', help='input text file', required=True)
@@ -53,18 +54,75 @@ def get_closed_valves():
 initial_closed_valves = get_closed_valves()
 
 # https://www.reddit.com/r/adventofcode/comments/zo21au/comment/j0nz8df/?utm_source=share&utm_medium=web2x&context=3 
+
+# part 1
+# bfs_queue = []
+# possible_board_states = []
+
+# board_state = {
+#     'position': 'AA',
+#     'time_remaining': time_limit,
+#     'pressure_released': 0,
+#     'remaining_valves': initial_closed_valves
+# }
+
+# bfs_queue.append(board_state)
+# possible_board_states.append(board_state)
+
+# while bfs_queue != []:
+#     current_board_state = bfs_queue.pop(0)
+#     current_position = current_board_state['position']
+#     time_remaining = current_board_state['time_remaining']
+#     pressure_released = current_board_state['pressure_released']
+#     remaining_valves = current_board_state['remaining_valves']
+
+#     for next_valve in remaining_valves:
+#         time_cost = shortest_path_dict[current_position][next_valve] + time_to_open
+#         potential_pressure_released = (time_remaining - time_cost) *  valve_rate[next_valve]
+#         if potential_pressure_released < 0:             # if time cost is more than time remaining, then cannot open this valve
+#             continue
+
+#         new_position = next_valve
+#         new_time_remaining = time_remaining - time_cost
+#         new_pressure_released = pressure_released + potential_pressure_released
+#         new_remaining_valves = deepcopy(remaining_valves)
+#         new_remaining_valves.remove(new_position)
+
+#         new_board_state = {
+#             'position': new_position,
+#             'time_remaining': new_time_remaining,
+#             'pressure_released': new_pressure_released,
+#             'remaining_valves': new_remaining_valves
+#         }
+
+#         bfs_queue.append(new_board_state)
+#         possible_board_states.append(new_board_state)
+
+
+# part 2 
+
+# creating all combinations of 2 subsets for the initial closed valves of interest
+
+possible_subset_list = []
+for L in range(len(initial_closed_valves) + 1):
+    for subset in itertools.combinations(initial_closed_valves, L):
+        possible_subset_list.append(set(subset))
+possible_subset_list.remove(set())  # deletes empty sets since they are unecessary
+
+time_limit = 26
 bfs_queue = []
 possible_board_states = []
 
-board_state = {
-    'position': 'AA',
-    'time_remaining': time_limit,
-    'pressure_released': 0,
-    'remaining_valves': initial_closed_valves
-}
+for subset in possible_subset_list:
+    board_state = {
+        'position': 'AA',
+        'time_remaining': time_limit,
+        'pressure_released': 0,
+        'remaining_valves': subset
+    }
+    possible_board_states.append(board_state)
+    bfs_queue.append(board_state)
 
-bfs_queue.append(board_state)
-possible_board_states.append(board_state)
 while bfs_queue != []:
     current_board_state = bfs_queue.pop(0)
     current_position = current_board_state['position']
@@ -94,10 +152,17 @@ while bfs_queue != []:
         bfs_queue.append(new_board_state)
         possible_board_states.append(new_board_state)
 
+# pretrimming the possible board state
+possible_pairs_list = []
+for board_state_1 in possible_board_states:
+    for board_state_2 in possible_board_states:
+        if board_state_1['remaining_valves'].isdisjoint(board_state_2['remaining_valves']):
+            possible_pairs_list.append([board_state_1, board_state_1])
+
 pressure = 0
-for board_state in possible_board_states:
-    # print(board_state)
-    if board_state['pressure_released'] > pressure:
-        pressure = board_state['pressure_released']
+for board_state_1, board_state_2 in possible_pairs_list:
+    print(board_state_1, board_state_2)
+    if board_state_1['pressure_released'] + board_state_2['pressure_released'] > pressure:
+        pressure = board_state_1['pressure_released'] + board_state_2['pressure_released']
 print(pressure)
 
