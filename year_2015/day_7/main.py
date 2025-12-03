@@ -110,7 +110,7 @@ def main():
 			# out == current node
 			# the inputs are leaf nodes, outputs are root nodes since they require leaf node data to get value
 			# if the circuit does not have current output gate, add it
-			if not circuit.has_node(out): 				
+			if not circuit.has_node(out): 			
 				circuit.add_node(out, operation=operation, value=wire_val)
 
 			if operation == 'WIRE': # if output is a wire
@@ -143,11 +143,11 @@ def main():
 	perform_logic(circuit, aoc_node)
 	print('part 1:', aoc_node, circuit.nodes[aoc_node])
 
-	aoc_node2 = 'a'
-	# override value of wire b to output of a
-	circuit2.nodes[aoc_node2]['value'] = 16076
-	perform_logic(circuit2, aoc_node2)
-	print('part 2:', aoc_node2, circuit2.nodes[aoc_node2])
+	# hardcode value of wire b to the output of a from part 1
+	circuit2.nodes['b']['value'] = circuit.nodes['a']['value']
+
+	perform_logic(circuit2, aoc_node)
+	print('part 2:', aoc_node, circuit2.nodes[aoc_node])
 
 
 
