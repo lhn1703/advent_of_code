@@ -1,82 +1,156 @@
-'''
-solution is a digraph
-each node (logic gate) has the following attributes:
-    title (name of the output variable)
-    operation (and, or, xor, not, etc)
-    output value (only 1 value)
-each edge (wire) has the following attributes:
-    title (name of the variable)
-    wire value (only 1 value)
-
-parsing algorithm:
-    go through line by line
-    create all nodes first with empty attributes 
-    connect edges and apply attributes as needed
-    
-
-graph algorithm:
-    construct the entire circuit graph
-    find the root (the starting point) node
-    perform BFS and update edge values: evaluate node inputs and node outputs 
-
-pyvis:
-    label displays always
-    title is for mouse hover text
-'''
+from parse import *
 import networkx as nx
-from pyvis.network import Network
+from copy import deepcopy
 
-def parse_line(line):
-    input = line.split(' -> ')[0]           # input can be a literal, wire, or combination
-    input_1= None
-    input_2 = None
-    output = line.split(' -> ')[1]          # output will always be a wire
-    operation = None
+# make sure to & 0xffff for 16 bit
+def parse_string(input_string: str):
+	str_list = parse('{} -> {}', input_string)
+	in1 = in2 = operation = out = wire_val = None
 
-    if input.isdigit():
-        input_1 = int(input)
-        operation = 'ASSIGN'
-    elif 'AND' in input or 'OR' in input:
-        input_1 = input.split()[0]
-        operation = input.split()[1]
-        input_2 = input.split()[2]
-    elif 'NOT' in input:
-        operation = input.split()[0]
-        input_1 = input.split()[1]
-    elif 'SHIFT' in input:
-        input_1 = input.split()[0]
-        operation = input.split()[1]
-    else:
-        raise Exception('{} is not a valid line'.format(line))
-    return input_1, input_2, operation, output
+	lhs = str_list[0]
+	rhs = str_list[1]
 
-with open('test.txt', 'r') as input_file:
-    input_text = input_file.read().splitlines()
+	out = rhs.strip()
 
-digital_circuit = nx.DiGraph()
+	if lhs.isdigit(): # if first part only contains numbers then it is a wire
+		wire_val = int(lhs.strip()) & 0xffff
+		operation = 'WIRE'
+	elif 'AND' in lhs or 'OR' in lhs:
+		lhs_str = parse('{} {} {}', lhs)
+		in1 = lhs_str[0]
+		operation = lhs_str[1]
+		in2 = lhs_str[2]
+	elif 'LSHIFT' in lhs or 'RSHIFT' in lhs:
+		lhs = lhs.split()
+		in1 = lhs[0]
+		operation = str(lhs[1]) + ' ' + str(lhs[2])
+	elif 'NOT' in lhs:
+		lhs = lhs.split()
+		operation = str(lhs[0])
+		in1 = lhs[1]
+	elif lhs.islower() and rhs.islower(): # special exception for weird wires
+		operation = 'WIRE'
+		in1 = lhs
+	else:
+		raise Exception('--ERROR-- unsupported string: ', input_string)
+	
+	return in1, in2, operation, out, wire_val
+	
+def perform_logic(circuit: nx.DiGraph, node): # recursive function 
+	operation = circuit.nodes[node]['operation']
+	edge_list = list(circuit.out_edges(node))
 
-# first pass to create all nodes
-# all nodes will be added with this since all output variables must eventually be driven by a defined value
-for line in input_text:
-    input_1, input_2, operation, output = parse_line(line)
-    digital_circuit.add_node(output, label=output, operation=operation, output_value=None)
+	# special case if the there is a value harded coded as one of the nodes
+	if node.isdigit():
+		circuit.nodes[node]['operation'] = 'WIRE'
+		circuit.nodes[node]['value'] = int(node) & 0xffff
+		return
+	
+	if operation == 'WIRE': 
+		if len(edge_list) == 0: # base case hitting the leaf node
+			return
+		elif len(edge_list) == 1: # weird exception case where there is 2 wires connected to eachother
+			edge = edge_list[0]
+			u,v = edge
+			if circuit.nodes[v]['value'] == None:
+				perform_logic(circuit, v)
+				assert circuit.nodes[v]['value'] != None
+				circuit.nodes[node]['value'] = circuit.nodes[v]['value']
 
-# assigning the edges
-for line in input_text:
-    input_1, input_2, operation, output = parse_line(line)
-    
-    if operation == 'ASSIGN':                       # this node must be a source node if it only drives an input literal
-        digital_circuit.nodes[output]['output_value'] = input_1     # special case because of assign
-    elif operation == 'AND' or operation == 'OR':
-        digital_circuit.add_edge(input_1, output, wire_value=None, title=input_1)
-        digital_circuit.add_edge(input_2, output, wire_value=None, title=input_2)
-    else:   # this is shift operator case, input_1 contains the shift amount
-        digital_circuit.add_edge(input_1, output, wire_value=None, title=input_1)
+	elif 'SHIFT' in operation or 'NOT' in operation:
+		assert len(edge_list) == 1
+		edge = edge_list[0]
+		u,v = edge
+
+		if circuit.nodes[v]['value'] == None:
+			perform_logic(circuit, v)
+		assert circuit.nodes[v]['value'] != None
+
+		computed_value = None
+		if 'SHIFT' in operation:
+			shift_op = operation.split()[0]
+			operand = int(operation.split()[1])
+			if shift_op == 'LSHIFT':
+				computed_value = circuit.nodes[v]['value'] << operand
+			elif shift_op == 'RSHIFT':
+				computed_value = circuit.nodes[v]['value'] >> operand
+			else:
+				raise Exception("Invalid operation", operation)
+		elif operation == 'NOT':
+			computed_value = ~circuit.nodes[v]['value']
+		circuit.nodes[node]['value'] = computed_value & 0xffff # 16 bit integer mask
+	elif operation == 'AND' or operation == 'OR':
+		assert len(edge_list) == 2
+		edge0, edge1 = edge_list[0], edge_list[1]
+		u0, v0 = edge0
+		u1, v1 = edge1
+
+		if circuit.nodes[v0]['value'] == None:
+			perform_logic(circuit, v0)
+		assert circuit.nodes[v0]['value'] != None
+
+		if circuit.nodes[v1]['value'] == None:
+			perform_logic(circuit, v1)
+		assert circuit.nodes[v1]['value'] != None
+
+		computed_value = None
+		if operation == 'AND':
+			computed_value = circuit.nodes[v0]['value'] & circuit.nodes[v1]['value']
+		elif operation == 'OR':
+			computed_value = circuit.nodes[v0]['value'] | circuit.nodes[v1]['value']
+		circuit.nodes[node]['value'] = computed_value & 0xffff # 16 bit integer mask
+
+def main():
+	### PART 1
+	# creating circuit graph
+	circuit = nx.DiGraph()
+	with open('input.txt', 'r') as ifile:
+		for line in ifile:
+			in1, in2, operation, out, wire_val = parse_string(line)
+			# out == current node
+			# the inputs are leaf nodes, outputs are root nodes since they require leaf node data to get value
+			# if the circuit does not have current output gate, add it
+			if not circuit.has_node(out): 				
+				circuit.add_node(out, operation=operation, value=wire_val)
+
+			if operation == 'WIRE': # if output is a wire
+				if wire_val == None: # edge case of double wires
+					circuit.add_edge(out, in1)
+				pass
+			elif 'SHIFT' in operation or 'NOT' in operation:
+				if not circuit.has_node(in1): # create empty input node if not exist
+					circuit.add_node(in1, operation=None, value=None)
+				circuit.add_edge(out, in1)
+			elif operation == 'AND' or operation == 'OR':
+				if not circuit.has_node(in1): # create empty input node1 if not exist
+					circuit.add_node(in1, operation=None, value=None)
+				circuit.add_edge(out, in1)
+				if not circuit.has_node(in2): # create empty input node2 if not exist
+					circuit.add_node(in2, operation=None, value=None)
+				circuit.add_edge(out, in2)
+			else:
+				print('unsuported string:', line)
+				raise Exception()
+			
+			# update current output node
+			
+			circuit.nodes[out]['value'] = wire_val
+			circuit.nodes[out]['operation'] = operation
+
+	circuit2 = deepcopy(circuit)
+
+	aoc_node = 'a'
+	perform_logic(circuit, aoc_node)
+	print('part 1:', aoc_node, circuit.nodes[aoc_node])
+
+	aoc_node2 = 'a'
+	# override value of wire b to output of a
+	circuit2.nodes[aoc_node2]['value'] = 16076
+	perform_logic(circuit2, aoc_node2)
+	print('part 2:', aoc_node2, circuit2.nodes[aoc_node2])
 
 
-pyvis_network = Network('500px', '500px', directed=True)
-pyvis_network.from_nx(digital_circuit)
-html_content = pyvis_network.generate_html('circuit.html')
 
-with open('circuit.html', 'w') as output_file:
-    output_file.write(html_content)
+if __name__ == "__main__":
+	main()
+
